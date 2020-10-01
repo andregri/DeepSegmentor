@@ -6,8 +6,8 @@ from matplotlib import pyplot as plt
 dir = '/home/andrea/Downloads/RoadNet/DeepSegmentor-master/results/roadnet/test_latest/images/'
 
 #img_code = '1-6-3'  # straight
-#img_code = '1-9-8'  # small curve
-img_code = '1-1-8'  # bad curve 
+img_code = '1-9-8'  # small curve
+#img_code = '1-1-8'  # bad curve 
 
 # load the images
 image = cv2.imread(dir + img_code + '_image.png', cv2.IMREAD_COLOR)
@@ -82,100 +82,24 @@ plt.hist(x, bins=bins, range=(0.1, x.max()), rwidth=0.9*bin_width)
 ticks = [0.1 + bin_width * i for i in range(bins)]
 plt.xticks(ticks=ticks, rotation=70)
 mean = np.mean(x)
-plt.title("mean: " + str(mean))
+var  = np.std(x)
+plt.title("mean: " + str(mean) + "  std: " + str(var))
 plt.show()
 
-cv2.waitKey(0)
+#cv2.waitKey(0)
 cv2.destroyAllWindows()
 
 ########################################################################################################################
 
-r = 10
-y,x = np.ogrid[-r: r+1, -r: r+1]
-disk = x**2+y**2 <= r**2
-disk = disk.astype(float)
+# Create the mask
+unique, counts = np.unique(x, return_counts=True)
+estimated_width = mean
+print("estimated width: " + str(estimated_width))
+estimated_road = cv2.dilate(label_gt, kernel, iterations=estimated_width, borderType=cv2.BORDER_REFLECT)
 
-def test_func(values):
-    delta_x = np.max(values[0]) - np.min(values[0])
-    delta_y = np.max(values[1]) - np.min(values[1])
-    return delta_y / delta_x
+added_image1 = cv2.addWeighted(image, 1.0, thick_gt, 1.0, 0)
+added_image2 = cv2.addWeighted(added_image1, 0.8, estimated_road, 1.0, 0)
+cv2.imshow('Estimation', added_image2)
 
-results = ndimage.generic_filter(label_gt, test_func, footprint=disk(11))
-
-
-# 
-inner_label_gt = np.array(label_gt[5:-5,5:-5])
-
-print(inner_label_gt.shape)
-print(label_gt.shape)
-
-centerline_points = []
-for i in range(inner_label_gt.shape[0]):
-    for j in range(inner_label_gt.shape[1]):
-        centerline_points.append((i,j))
-
-
-
-# Find contours in the label_gt image
-threshold = 100
-label_gt_gray = cv2.cvtColor(label_gt, cv2.COLOR_BGR2GRAY)
-label_gt_edges = cv2.Canny(label_gt_gray, threshold, threshold * 2)
-cv2.imshow('Contours', label_gt_edges)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
-_, contours, hierarchy = cv2.findContours(label_gt_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-for i in range(len(contours)):
-    drawing = np.zeros(label_gt_edges.shape[:2] + (3,), dtype=np.uint8)
-    cv2.drawContours(drawing, contours, i, (0, 255, 0), 1, cv2.LINE_8, hierarchy, 0)
-    cv2.imshow('Contours', drawing)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-for contour in contours:
-    contour = np.squeeze(contour)
-    print(contour)
-    diff = np.diff(contour, axis=0)
-    print(diff)
-    slope = np.array([np.arctan(y/x) if x != 0 else np.pi/2 for x,y in diff])
-    print(slope)
-
-    cv2.circle(drawing, tuple(c[0][0]), 3, (255, 0, 0), 2)
-    cv2.circle(drawing, tuple(c[1][0]), 3, (0, 0, 255), 2)
-    cv2.imshow('Contours', drawing)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-# Find lines of the label_gt image
-label_gt_gray = cv2.cvtColor(label_gt, cv2.COLOR_BGR2GRAY)
-label_gt_edges = cv2.Canny(label_gt_gray, 50, 200)
-label_gt_lines = cv2.HoughLinesP(label_gt_edges, 1, np.pi/180, 50, minLineLength=10, maxLineGap=250)
-for line in label_gt_lines:
-    x1, y1, x2, y2 = line[0]
-    cv2.line(label_gt, (x1, y1), (x2, y2), (0, 0, 255), 1)
-
-cv2.imshow("Result Image", label_gt)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
-# Load the preds
-
-gray = cv2.cvtColor(label_pred, cv2.COLOR_BGR2GRAY)
-cv2.imshow('gsadg', gray)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
-# Find lines from the label_pred image
-gray = cv2.cvtColor(label_pred, cv2.COLOR_BGR2GRAY)
-edges = cv2.Canny(gray, 50, 200)
-lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, minLineLength=10, maxLineGap=250)
-for line in lines:
-    x1, y1, x2, y2 = line[0]
-    cv2.line(label_pred, (x1, y1), (x2, y2), (0, 0, 255), 1)
-
-# Overlay label_gt and label_pred
-added_image = cv2.addWeighted(label_pred, 0.4, label_gt, 0.1, 0)
-
-cv2.imshow("Result Image", added_image)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
