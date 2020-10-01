@@ -1,0 +1,29 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "/home/andrea/Documents/tesi/DeepSegmentor",
+            "args": [
+                "--dataroot", "./datasets/RoadNet",
+                "--name", "roadnet",
+                "--model", "roadnet",
+                "--dataset_mode", "roadnet",
+                "--gpu_ids", "-1",
+                "--batch_size", "1",
+                "--output_nc", "1",
+                "--norm", "batch",
+                "--load_width", "512",
+                "--load_height", "512",
+                "--use_selu", "0",
+                "--num_test", "50"]
+        }
+    ]
+}
