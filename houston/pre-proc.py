@@ -11,6 +11,15 @@ from qgis.core import (
 
 from qgis.analysis import QgsNativeAlgorithms
 
+import argparse
+
+parser = argparse.ArgumentParser(description="Prepare the houston dataset for roadnet")
+parser.add_argument('--data_dir', type=str, default="/home/andrea/Downloads/Final RGB HR Imagery/3/", help="dir containing the image")
+parser.add_argument('--image', type=str, default="UH_NAD83_271460_3290290.tif", help="filename of the tif image")
+parser.add_argument('--osm', type=str, default="UH_NAD83_271460_3290290_centerline.kml", help="filename of the kml file downloaded from overpass")
+
+args = parser.parse_args()
+
 # See https://gis.stackexchange.com/a/155852/4972 for details about the prefix 
 QgsApplication.setPrefixPath('/usr', True)
 qgs = QgsApplication([], False)
@@ -24,11 +33,16 @@ from processing.core.Processing import Processing
 Processing.initialize()
 QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
 
-data_dir = "/home/andrea/Downloads/Final RGB HR Imagery/2/"
+data_dir = args.data_dir + '/'
+print(data_dir)
+image = args.image
+print(image)
+osm = args.osm
+print(osm)
 
 # Load raster layer
-path_to_tif = data_dir + "UH_NAD83_271460_3290290.tif"
-rlayer = QgsRasterLayer(path_to_tif, "UH_NAD83_271460_3290290")
+path_to_tif = data_dir + image
+rlayer = QgsRasterLayer(path_to_tif, image.replace('.tif', ''))
 if not rlayer.isValid():
     print("Layer failed to load!")
 else:
@@ -53,7 +67,7 @@ else:
     QgsProject.instance().addMapLayer(resampled_layer)
 
 # Load vector layer
-path_to_centerline_layer = data_dir + "UH_NAD83_271460_3290290_centerline.kml"
+path_to_centerline_layer = data_dir + osm
 vlayer = QgsVectorLayer(path_to_centerline_layer, "centerline", "ogr")
 if not vlayer.isValid():
     print("Layer failed to load!")
