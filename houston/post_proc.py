@@ -6,8 +6,8 @@ import random as rng
 
 dir = '/home/andrea/Downloads/RoadNet/DeepSegmentor-master/results/roadnet/test_latest/images/'
 
-#img_code = '1-6-3'  # straight
-img_code = '1-9-8'  # small curve
+img_code = '1-6-3'  # straight
+#img_code = '1-9-8'  # small curve
 #img_code = '1-1-8'  # bad curve 
 
 # load the images
@@ -80,37 +80,6 @@ centerline_3px = cv2.dilate(label_gt, kernel, iterations=1, borderType=cv2.BORDE
 masked_norm_dist = cv2.bitwise_and(norm_dist, norm_dist, mask=centerline_3px[:,:,-1])
 cv2.imshow('masked_dist', masked_norm_dist)
 
-# Plot the histogram of the distance in the centerline
-masked_dist = cv2.bitwise_and(dist, dist, mask=centerline_3px[:,:,-1])
-x = np.array([d for d in masked_dist.flatten() if d != 0])
-bins = 25
-bin_width = (x.max()-0.1)/bins
-plt.hist(x, bins=bins, range=(0.1, x.max()), rwidth=0.9*bin_width)
-ticks = [0.1 + bin_width * i for i in range(bins)]
-plt.xticks(ticks=ticks, rotation=70)
-mean = np.mean(x)
-var  = np.std(x)
-plt.title("mean: " + str(mean) + "  std: " + str(var))
-#plt.show()
-
-#cv2.waitKey(0)
-#cv2.destroyAllWindows()
-
-########################################################################################################################
-
-# Create the mask
-unique, counts = np.unique(x, return_counts=True)
-estimated_width = mean
-print("estimated width: " + str(estimated_width))
-estimated_road = cv2.dilate(label_gt, kernel, iterations=estimated_width, borderType=cv2.BORDER_REFLECT)
-
-added_image1 = cv2.addWeighted(image, 1.0, thick_gt, 1.0, 0)
-added_image2 = cv2.addWeighted(added_image1, 0.8, estimated_road, 1.0, 0)
-cv2.imshow('Estimation', added_image2)
-
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
 
 ########################################################################################################################
 
@@ -135,9 +104,6 @@ temp = np.array(thick_gt)
 for p in start_points:
     temp = cv2.circle(temp, (p[1],p[0]), 15, (0, 255, 0), 2)
 cv2.imshow("Start points", temp)
-
-cv2.waitKey(0)
-cv2.destroyAllWindows()
 
 # DFS algorithm to find all instances
 def adjacent_edges(matrix, point):
@@ -193,6 +159,49 @@ for i in np.unique(discovered):
         road_instances[discovered==i] = (rng.randint(0,256), rng.randint(0,256), rng.randint(0,256))
 cv2.imshow('Instances', road_instances)
 
+
+########################################################################################################################
+
+
+# Plot the histogram of the distance in the centerline
+masked_dist = cv2.bitwise_and(dist, dist, mask=centerline_3px[:,:,-1])
+x = np.array([d for d in masked_dist.flatten() if d != 0])
+bins = 25
+bin_width = (x.max()-0.1)/bins
+plt.hist(x, bins=bins, range=(0.1, x.max()), rwidth=0.9*bin_width)
+ticks = [0.1 + bin_width * i for i in range(bins)]
+plt.xticks(ticks=ticks, rotation=70)
+mean = np.mean(x)
+var  = np.std(x)
+plt.title("mean: " + str(mean) + "  std: " + str(var))
+#plt.show()
+
+# Estimate the width for each road instance
+estimated_road = np.zeros(label_gt.shape[:2], dtype=np.uint8)
+for i in np.unique(discovered):
+    if i > 0:
+        inst = np.zeros(label_gt.shape[:2], dtype=np.float32)
+        inst[discovered==i] = masked_dist[discovered==i]
+
+        x = np.array([d for d in inst.flatten() if d != 0])
+        unique, counts = np.unique(x, return_counts=True)
+        #estimated_width = unique[np.argmax(counts)]
+        estimated_width = np.mean(x)
+        print(estimated_width)
+
+        temp = np.zeros(label_gt.shape[:2], dtype=np.uint8)
+        temp[discovered==i] = 255
+        temp = cv2.dilate(temp, kernel, iterations=int(estimated_width), borderType=cv2.BORDER_REFLECT)
+
+        estimated_road = cv2.bitwise_or(estimated_road, temp)
+
+# Overlap the estimated road on the image
+estimated_road_rgb = np.zeros(label_gt.shape, dtype=np.uint8)
+estimated_road_rgb[:,:,-1] = estimated_road
+
+added_image1 = cv2.addWeighted(image, 1.0, thick_gt, 1.0, 0)
+added_image2 = cv2.addWeighted(added_image1, 0.8, estimated_road_rgb, 1.0, 0)
+cv2.imshow('Estimation', added_image2)
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
