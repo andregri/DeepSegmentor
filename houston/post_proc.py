@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import scipy.ndimage as ndimage
 from matplotlib import pyplot as plt
+import random as rng
 
 dir = '/home/andrea/Downloads/RoadNet/DeepSegmentor-master/results/roadnet/test_latest/images/'
 
@@ -48,8 +49,14 @@ bw_rgb[:,:,-1] = bw
 added_image1 = cv2.addWeighted(bw_rgb, 0.8, mask, 0.4, 0)
 cv2.imshow('Binary Image', added_image1)
 
+"""
+# Fill holes applying the closing operator
+closing_kernel = np.ones((9,9), np.uint8)
+closing = cv2.morphologyEx(bw, cv2.MORPH_CLOSE, closing_kernel)
+cv2.imshow('Closed inary Image', closing)"""
+
 # Find Contours of the thresholded masked_pred
-_, contours, hierarchy = cv2.findContours(bw, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+_, contours, hierarchy = cv2.findContours(bw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 drawing = np.zeros(bw.shape[:2] + (3,), dtype=np.uint8)
 for i in range(len(contours)):
     cv2.drawContours(drawing, contours, i, (0, 255, 0), 1, cv2.LINE_8, hierarchy, 0)
@@ -84,10 +91,10 @@ plt.xticks(ticks=ticks, rotation=70)
 mean = np.mean(x)
 var  = np.std(x)
 plt.title("mean: " + str(mean) + "  std: " + str(var))
-plt.show()
+#plt.show()
 
 #cv2.waitKey(0)
-cv2.destroyAllWindows()
+#cv2.destroyAllWindows()
 
 ########################################################################################################################
 
@@ -100,6 +107,92 @@ estimated_road = cv2.dilate(label_gt, kernel, iterations=estimated_width, border
 added_image1 = cv2.addWeighted(image, 1.0, thick_gt, 1.0, 0)
 added_image2 = cv2.addWeighted(added_image1, 0.8, estimated_road, 1.0, 0)
 cv2.imshow('Estimation', added_image2)
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
+
+########################################################################################################################
+
+
+# Find Road Instances from the gt centerline
+
+# Find where a road starts from the border of the image
+start_points = []
+
+for row in [0, image.shape[0]-1]: # top and bottom border
+    for col in range(0, image.shape[1]):
+        if(label_gt[row,col,-1]==255):
+            start_points.append((row,col))
+
+for col in [0, image.shape[1]-1]: # left and right border
+    for row in range(0, image.shape[0]):
+        if(label_gt[row,col,-1]==255):
+            start_points.append((row,col))
+
+cv2.imshow("Start points", thick_gt)
+temp = np.array(thick_gt)
+for p in start_points:
+    temp = cv2.circle(temp, (p[1],p[0]), 15, (0, 255, 0), 2)
+cv2.imshow("Start points", temp)
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
+# DFS algorithm to find all instances
+def adjacent_edges(matrix, point):
+    neighbours = [
+        (point[0]-1, point[1]-1),
+        (point[0]-1, point[1]  ),
+        (point[0]-1, point[1]+1),
+        (point[0],   point[1]+1),
+        (point[0]+1, point[1]+1),
+        (point[0]+1, point[1]  ),
+        (point[0]+1, point[1]-1),
+        (point[0]  , point[1]-1)
+    ]
+    edges = []
+    for p in neighbours:
+        if 0 <= p[0] < matrix.shape[0] and 0 <= p[1] < matrix.shape[1]:
+            if matrix[p] != 0:
+                edges.append(p)
+    
+    intersection = False
+    if len(edges) == 3:
+        intersection = True
+
+    return edges, intersection
+
+discovered = np.full(label_gt.shape[:2], 0, dtype=np.uint8)
+road_instance = 1
+
+# DFS algorithm
+for v in start_points:
+    S = []
+    S.append(v)
+    while len(S) != 0:
+        v = S.pop()
+        edges, intersect = adjacent_edges(label_gt[:,:,-1], v)
+        if intersect:
+            road_instance += 1
+        if discovered[v] == 0:
+            discovered[v] = road_instance
+            for w in edges: 
+                S.append(w)
+
+        temp = np.array(thick_gt)
+        temp = cv2.circle(temp, (v[1],v[0]), 15, (0, 255, 255), 2)
+        #cv2.imshow('DFS', temp)
+        #cv2.waitKey(5)
+    road_instance += 1
+
+# Draw the road instances with different colors
+road_instances = np.zeros(label_gt.shape, dtype=np.uint8)
+for i in np.unique(discovered):
+    if i > 0:
+        road_instances[discovered==i] = (rng.randint(0,256), rng.randint(0,256), rng.randint(0,256))
+cv2.imshow('Instances', road_instances)
+
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
