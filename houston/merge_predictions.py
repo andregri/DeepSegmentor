@@ -48,9 +48,9 @@ def bb_mask(H=512, W=512):
 # Bilinear blending
 def bilinearBlending(image):
     mask = np.zeros(image.shape, dtype=np.float32)
-    mask[:,:,0] = bb_mask()
-    mask[:,:,1] = bb_mask()
-    mask[:,:,2] = bb_mask()
+    mask[:,:,0] = bb_mask(image.shape[0], image.shape[1])
+    mask[:,:,1] = bb_mask(image.shape[0], image.shape[1])
+    mask[:,:,2] = bb_mask(image.shape[0], image.shape[1])
     norm_image = np.array(image/255.0, dtype=np.float32)
     norm_output = np.multiply(norm_image, mask)
     return norm_output
@@ -58,8 +58,7 @@ def bilinearBlending(image):
 # Resize the predictions to the original size of the associated input image
 def wasResized(img_fname, pred_fname, input_pred):
     img_shape  = cv2.imread(img_fname, cv2.IMREAD_COLOR).shape
-    pred = cv2.imread(pred_fname, cv2.IMREAD_COLOR)
-    if img_shape != pred.shape:
+    if img_shape != input_pred.shape:
         print('- Resizing "{}"'.format(pred_fname))
         resized = cv2.resize(input_pred, (img_shape[1],img_shape[0]))
         #cv2.imwrite(pred_fname.replace('.png','_warped.png'), pred)
@@ -114,6 +113,8 @@ def imageCrop(im_file, save_path):
 
 def imageMerge(output_shape, img_fnames, pred_fnames, save_path, sz=(H,W), step=256):
     assert os.path.isdir(save_path)
+    #cv2.namedWindow('Merged',cv2.WINDOW_NORMAL)
+    #cv2.resizeWindow('Merged', 800,800)
 
     # Create the empty output image
     output_img = np.zeros(tuple(output_shape) + (3,), dtype=np.float32)
@@ -137,7 +138,7 @@ def imageMerge(output_shape, img_fnames, pred_fnames, save_path, sz=(H,W), step=
         # Resize if necessary
         resized = wasResized(img_fname, pred_fname, blended)
 
-        #cv2.imshow('Prediction: ' + fname, pred)
+        #cv2.imshow('Prediction: ' + fname, resized)
         #cv2.waitKey(0)
 
         h = row * step
@@ -149,16 +150,17 @@ def imageMerge(output_shape, img_fnames, pred_fnames, save_path, sz=(H,W), step=
         output_img[h:h+H, w:w+W, :] += resized
 
         #cv2.imshow('Merged', output_img)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
+        #cv2.waitKey(10)
+    cv2.destroyAllWindows()
+        
 
     cv2.imshow('Merged', output_img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-    output_png = np.array(output_img * 255, dtype=np.uint8)
+    output_png = np.array(output_img * 255, dtype=np.float32)
     output_fname = save_path + '1-merged.png'
-    cv2.imwrite(output_fname, output_png)
+    cv2.imwrite(output_fname, output_png, [cv2.IMWRITE_PNG_COMPRESSION, 0])
     print('- Merged image was saved to {}'.format(output_fname))
 
 imageMerge(im_shape, img_fnames, pred_fnames, '/tmp/')
