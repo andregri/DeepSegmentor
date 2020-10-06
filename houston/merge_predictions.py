@@ -1,44 +1,74 @@
 from pathlib import Path
 import os
 import numpy as np
+from matplotlib import pyplot as plt
 import cv2
 
 img_dir = Path('/home/andrea/Downloads/join-images/test_image')
 pred_dir = Path('/home/andrea/Downloads/join-images/test_latest/images')
 
-########################################################################################################################
-
-# Resize the predictions to the original size of the associated input image
-
 img_fnames  = sorted([f.as_posix() for f in img_dir.rglob('*.png')])
 pred_fnames = [f.replace('/test_image', '/test_latest/images').replace('.png', '_label_pred.png') for f in img_fnames]
-
-for img_fname, pred_fname in zip(img_fnames, pred_fnames):
-    img_shape  = cv2.imread(img_fname, cv2.IMREAD_COLOR).shape
-    pred = cv2.imread(pred_fname, cv2.IMREAD_COLOR)
-    if img_shape != pred.shape:
-        print('- Resizing "{}"'.format(pred_fname))
-        cv2.imwrite(pred_fname.replace('.png','_warped.png'), pred)
-        resized = cv2.resize(pred, (img_shape[1],img_shape[0]))
-        cv2.imwrite(pred_fname, resized)
-
-########################################################################################################################
-im_shape = [2862, 2838]
-
-info_file  = [f for f in img_dir.rglob('*.info')]
-with open(info_file[0].as_posix()) as info:
-    line = info.readlines()[0]
-    infos = line.split()
-    crop_info = {}
-    crop_info['new_h']    = infos[0]
-    crop_info['new_w']    = infos[1]
-    crop_info['offset_h'] = infos[2]
-    crop_info['offset_w'] = infos[3]
 
 im_shape = [2862, 2838]
 H = 512
 W = 512
 step = 256
+
+########################################################################################################################
+
+# Create the mask
+def bb_mask(H=512, W=512):
+
+    mask = np.zeros((H,W), dtype=np.float32)
+
+    H = int(H/2)
+    W = int(W/2)
+
+    for h in range(H):
+        for w in range(W):
+            # mask A
+            mask[h+H,w+W] = (W-w) * (H-h) / (H * W)
+            # mask B
+            mask[h+H,w]   = w * (H - h) / (H * W)
+            # mask C
+            mask[h,  w]   = h * w / (H * W)
+            # mask D
+            mask[h,  w+W] = (W-w) * h / (H*W)
+
+    #plt.figure(figsize=(10,10))
+    #plt.imshow(mask, cmap='jet')
+    #plt.show()
+    #cv2.imshow('bb_mask', mask)
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
+
+    return mask
+
+# Bilinear blending
+def bilinearBlending(image):
+    mask = np.zeros(image.shape, dtype=np.float32)
+    mask[:,:,0] = bb_mask()
+    mask[:,:,1] = bb_mask()
+    mask[:,:,2] = bb_mask()
+    norm_image = np.array(image/255.0, dtype=np.float32)
+    norm_output = np.multiply(norm_image, mask)
+    return norm_output
+
+# Resize the predictions to the original size of the associated input image
+def wasResized(img_fname, pred_fname, input_pred):
+    img_shape  = cv2.imread(img_fname, cv2.IMREAD_COLOR).shape
+    pred = cv2.imread(pred_fname, cv2.IMREAD_COLOR)
+    if img_shape != pred.shape:
+        print('- Resizing "{}"'.format(pred_fname))
+        resized = cv2.resize(input_pred, (img_shape[1],img_shape[0]))
+        #cv2.imwrite(pred_fname.replace('.png','_warped.png'), pred)
+        #cv2.imwrite(pred_fname, resized)
+        return resized
+    else:
+        return input_pred
+
+# 
 def crop_info(im_shape, sz=(H,W), step=step):
     new_h = im_shape[0] / step
     offset_h = im_shape[0] % step
@@ -51,9 +81,6 @@ def crop_info(im_shape, sz=(H,W), step=step):
         new_w += 1
         offset_w = step - offset_w
     return int(new_h), int(new_w), offset_h, offset_w
-
-
-new_h, new_w, offset_h, offset_w = crop_info(im_shape)
 
 
 def imageCrop(im_file, save_path):
@@ -84,26 +111,34 @@ def imageCrop(im_file, save_path):
                 "{}-{}-{}.png".format(fname, i, j)), 
                 im_roi, PNG_SAVE_MODE)
 
-def imageMerge(output_shape, pred_fnames, save_path, sz=(H,W), step=256):
+
+def imageMerge(output_shape, img_fnames, pred_fnames, save_path, sz=(H,W), step=256):
     assert os.path.isdir(save_path)
 
     # Create the empty output image
-    output_img = np.zeros(tuple(output_shape) + (3,), dtype=np.uint8)
+    output_img = np.zeros(tuple(output_shape) + (3,), dtype=np.float32)
 
     # Load cropping information
     new_h, new_w, offset_h, offset_w = crop_info(output_shape, (H,W), step)
 
     # Add each prediction to the merged image
-    for pred_fname in pred_fnames:
+    for (img_fname, pred_fname) in zip(img_fnames, pred_fnames):
         fname = pred_fname.replace('_label_pred.png','')
         fname = fname.split('/')[-1]
         row = int(fname.split('-')[-2])
         col = int(fname.split('-')[-1])
 
+        # Load image
         pred = cv2.imread(pred_fname, cv2.IMREAD_COLOR)
 
-        cv2.imshow('Prediction: ' + fname, pred)
-        cv2.waitKey(0)
+        # Apply bilinear blending
+        blended = bilinearBlending(pred)
+
+        # Resize if necessary
+        resized = wasResized(img_fname, pred_fname, blended)
+
+        #cv2.imshow('Prediction: ' + fname, pred)
+        #cv2.waitKey(0)
 
         h = row * step
         if row == new_h-1:
@@ -111,10 +146,19 @@ def imageMerge(output_shape, pred_fnames, save_path, sz=(H,W), step=256):
         w = col * step
         if col == new_w-1:
             w -= offset_w
-        output_img[h:h+H, w:w+W, :] = pred
+        output_img[h:h+H, w:w+W, :] += resized
 
-        cv2.imshow('Merged', output_img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        #cv2.imshow('Merged', output_img)
+        #cv2.waitKey(0)
+        #cv2.destroyAllWindows()
 
-imageMerge(im_shape, pred_fnames, '/tmp/')
+    cv2.imshow('Merged', output_img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    output_png = np.array(output_img * 255, dtype=np.uint8)
+    output_fname = save_path + '1-merged.png'
+    cv2.imwrite(output_fname, output_png)
+    print('- Merged image was saved to {}'.format(output_fname))
+
+imageMerge(im_shape, img_fnames, pred_fnames, '/tmp/')
