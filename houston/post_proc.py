@@ -4,6 +4,7 @@ import scipy.ndimage as ndimage
 from matplotlib import pyplot as plt
 
 from visual_utils import *
+from post_proc_utils import *
 
 dir = '/home/andrea/Downloads/RoadNet/DeepSegmentor-master/results/roadnet/test_latest/images/'
 
@@ -105,80 +106,23 @@ plt.title("mean: " + str(mean) + "  std: " + str(var))
 
 # Find Road Instances from the gt centerline
 
+
 # Find where a road starts from the border of the image
-start_points = []
-
-for row in [0, image_bgr.shape[0]-1]: # top and bottom border
-    for col in range(0, image_bgr.shape[1]):
-        if(label_gt_bgr[row,col,-1]==255):
-            start_points.append((row,col))
-
-for col in [0, image_bgr.shape[1]-1]: # left and right border
-    for row in range(0, image_bgr.shape[0]):
-        if(label_gt_bgr[row,col,-1]==255):
-            start_points.append((row,col))
-
+start_points = findRoadStartingPoints(label_gt_bgr[:,:,-1])
 cv2.imshow("Starting points", addCircles(red(thick_gt_bgr), start_points))
 
 
 # DFS algorithm to find all instances
-def adjacent_edges(matrix, point):
-    assert len(matrix.shape) == 2
-
-    neighbours = [
-        (point[0]-1, point[1]-1),
-        (point[0]-1, point[1]  ),
-        (point[0]-1, point[1]+1),
-        (point[0],   point[1]+1),
-        (point[0]+1, point[1]+1),
-        (point[0]+1, point[1]  ),
-        (point[0]+1, point[1]-1),
-        (point[0]  , point[1]-1)
-    ]
-    edges = []
-    for p in neighbours:
-        if 0 <= p[0] < matrix.shape[0] and 0 <= p[1] < matrix.shape[1]:
-            if matrix[p] != 0:
-                edges.append(p)
-    
-    intersection = False
-    if len(edges) == 3:
-        intersection = True
-
-    return edges, intersection
-
-discovered_gray = np.zeros(label_gt_bgr.shape[:2], dtype=np.uint8)
-road_instance = 1
-
-# DFS algorithm
-for v in start_points:
-    S = []
-    S.append(v)
-    while len(S) != 0:
-        v = S.pop()
-        edges, intersect = adjacent_edges(label_gt_bgr[:,:,0], v)
-        if intersect:
-            road_instance += 1
-        if discovered_gray[v] == 0:
-            discovered_gray[v] = road_instance
-            for w in edges: 
-                S.append(w)
-        #cv2.imshow('DFS', addCircles(thick_gt_bgr, [v]))
-        #cv2.waitKey(5)
-    road_instance += 1
+discovered_gray = DFS(label_gt_bgr[:,:,0], start_points)
 
 
 # Draw the road instances with different colors
 road_instances_bgr = colorInstances(discovered_gray, np.unique(discovered_gray))
 cv2.imshow('Road Instances', road_instances_bgr)
 
+
 cv2.imwrite('/tmp/5_road_instances.png', road_instances_bgr)
 
-# Compute the road instaces bariceter
-def baricenter(points):
-    y_mean = np.mean(points[0,:])
-    x_mean = np.mean(points[1,:])
-    return (int(y_mean), int(x_mean))
 
 road_instances_points = {}
 baricenters = {}
@@ -194,7 +138,7 @@ for i in np.unique(discovered_gray):
         y = np.array(y)
         x = np.array(x)
         road_instances_points[i] = np.stack([y, x])
-        b = baricenter(road_instances_points[i])
+        b = intBaricenter(road_instances_points[i])
         baricenters[i] = b
 
 cv2.imshow('Baricenters', addCircles(road_instances_bgr, list(baricenters.values())))
