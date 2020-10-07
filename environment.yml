@@ -4,6 +4,7 @@ channels:
 - menpo
 - conda-forge
 - defaults
+- anaconda
 dependencies:
 - python=3.5.5
 - pytorch=0.4.1
@@ -11,6 +12,7 @@ dependencies:
 - opencv3
 - scikit-image
 - scikit-learn
+- seaborn
 - pip:
   - dominate==2.3.1
   - Pillow==5.0.0
