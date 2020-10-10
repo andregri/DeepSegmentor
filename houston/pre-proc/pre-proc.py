@@ -12,11 +12,10 @@ from qgis.core import (
 from qgis.analysis import QgsNativeAlgorithms
 
 import argparse
+from pathlib import Path
 
 parser = argparse.ArgumentParser(description="Prepare the houston dataset for roadnet")
-parser.add_argument('--data_dir', type=str, default="/home/andrea/Downloads/Final RGB HR Imagery/3/", help="dir containing the image")
-parser.add_argument('--image', type=str, default="UH_NAD83_271460_3290290.tif", help="filename of the tif image")
-parser.add_argument('--osm', type=str, default="UH_NAD83_271460_3290290_centerline.kml", help="filename of the kml file downloaded from overpass")
+parser.add_argument('--data_dir', type=str, default="/home/andrea/Downloads/Final RGB HR Imagery/5", help="dir containing the image")
 
 args = parser.parse_args()
 
@@ -33,23 +32,23 @@ from processing.core.Processing import Processing
 Processing.initialize()
 QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
 
-data_dir = args.data_dir + '/'
+data_dir = Path(args.data_dir)
+tif_file = [img for img in data_dir.rglob('UH_NAD*.tif')][0]
+osm_file   = [o for o in data_dir.rglob('centerline.geojson')][0]
 print(data_dir)
-image = args.image
-print(image)
-osm = args.osm
-print(osm)
+print(tif_file)
+print(osm_file)
 
 # Load raster layer
-path_to_tif = data_dir + image
-rlayer = QgsRasterLayer(path_to_tif, image.replace('.tif', ''))
+rlayer = QgsRasterLayer(tif_file.as_posix(), tif_file.name.replace('.tif', ''))
 if not rlayer.isValid():
     print("Layer failed to load!")
 else:
     QgsProject.instance().addMapLayer(rlayer)
 
 # Resample the raster layer and save to a file
-path_to_resampled = data_dir + "resampled.tif"
+path_to_resampled = (data_dir / "resampled.tif").as_posix()
+print(path_to_resampled)
 parameters = {
     "INPUT": rlayer,
     "RESAMPLING": 0,
@@ -67,32 +66,29 @@ else:
     QgsProject.instance().addMapLayer(resampled_layer)
 
 # Load vector layer
-path_to_centerline_layer = data_dir + osm
-vlayer = QgsVectorLayer(path_to_centerline_layer, "centerline", "ogr")
+vlayer = QgsVectorLayer(osm_file.as_posix(), "centerline", "ogr")
 if not vlayer.isValid():
-    print("Layer failed to load!")
+    print("Layer failed to load: vlayer")
 else:
     QgsProject.instance().addMapLayer(vlayer)
     
 # Reproject the vector layer
-temp_dir = tempfile.TemporaryDirectory()
-path_to_reproj = temp_dir.name + "/reproj.shp"
+#temp_dir = tempfile.TemporaryDirectory()
 parameters = {
     "INPUT": vlayer,
     "TARGET_CRS": "EPSG:26915",
-    "OUTPUT": path_to_reproj
+    "OUTPUT": 'memory:Reprojected'
 }
-processing.run("qgis:reprojectlayer", parameters)
-reproj_layer = QgsVectorLayer(path_to_reproj, "reproj", "ogr")
+reproj_layer = processing.run("native:reprojectlayer", parameters)['OUTPUT']
 if not reproj_layer.isValid():
-    print("Layer failed to load!")
+    print("Layer failed to load: reproj layer")
 else:
     QgsProject.instance().addMapLayer(reproj_layer)
     
 # Rasterize the vector layer
-path_to_rasterization = data_dir + "centerline.tif"
+path_to_rasterization = (data_dir / "centerline.tif").as_posix()
 parameters = {
-    "INPUT": path_to_reproj,
+    "INPUT": reproj_layer,
     "BURN": 1,
     "UNITS": 1,
     "WIDTH": 0.21,
@@ -104,7 +100,7 @@ parameters = {
 processing.run("gdal:rasterize", parameters)
 rasterized_layer = QgsRasterLayer(path_to_rasterization, "rasterization")
 if not rasterized_layer.isValid():
-    print("Layer failed to load!")
+    print("Layer failed to load: rasterized layer")
 else:
     QgsProject.instance().addMapLayer(rasterized_layer)
 

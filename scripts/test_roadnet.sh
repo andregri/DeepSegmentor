@@ -9,7 +9,7 @@ BATCH_SIZE=1
 LOAD_WIDTH=512
 LOAD_HEIGHT=512
 
-NUM_TEST=100
+NUM_TEST=144
 
 python3 test.py \
   --dataroot ${DATAROOT} \
@@ -23,5 +23,4 @@ python3 test.py \
   --load_width ${LOAD_WIDTH} \
   --load_height ${LOAD_HEIGHT} \
   --use_selu 0 \
-#  --use_augment 0 \
   --num_test ${NUM_TEST}

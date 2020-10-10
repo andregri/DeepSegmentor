@@ -146,6 +146,7 @@ datasets/RoadNet/test_image/
 datasets/RoadNet/train_image/
 datasets/RoadNet/test_segment/
 datasets/RoadNet/train_segment/
+results/
 #
 #
 #
