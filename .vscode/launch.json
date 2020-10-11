@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "/home/andrea/Documents/tesi/DeepSegmentor",
-            "args": [
+            /*"args": [
                 "--dataroot", "./datasets/RoadNet",
                 "--name", "roadnet",
                 "--model", "roadnet",
@@ -23,7 +23,7 @@
                 "--load_width", "512",
                 "--load_height", "512",
                 "--use_selu", "0",
-                "--num_test", "50"]
+                "--num_test", "50"]*/
         }
     ]
 }

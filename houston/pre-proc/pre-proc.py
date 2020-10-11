@@ -33,6 +33,7 @@ Processing.initialize()
 QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
 
 data_dir = Path(args.data_dir)
+number = args.data_dir.split('/')[-1]
 tif_file = [img for img in data_dir.rglob('UH_NAD*.tif')][0]
 osm_file   = [o for o in data_dir.rglob('centerline.geojson')][0]
 print(data_dir)
@@ -47,7 +48,7 @@ else:
     QgsProject.instance().addMapLayer(rlayer)
 
 # Resample the raster layer and save to a file
-path_to_resampled = (data_dir / "resampled.tif").as_posix()
+path_to_resampled = (data_dir / "Houston-{}.tif".format(number)).as_posix()
 print(path_to_resampled)
 parameters = {
     "INPUT": rlayer,

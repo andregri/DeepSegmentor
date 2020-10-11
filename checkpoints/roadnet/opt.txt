@@ -3,7 +3,7 @@
                batch_size: 1                             
           checkpoints_dir: ./checkpoints                 
                 crop_size: 256                           
-                 dataroot: ./datasets/RoadNet            	[default: None]
+                 dataroot: ./datasets/Houston-Dataset    	[default: None]
              dataset_mode: roadnet                       	[default: deepcrack]
                 direction: AtoB                          
             display_sides: 1                             
@@ -33,7 +33,7 @@
                      norm: batch                         	[default: instance]
                     ntest: inf                           
               num_classes: 2                             
-                 num_test: 144                           	[default: 150]
+                 num_test: 2030                          	[default: 150]
               num_threads: 2                             
                 output_nc: 1                             	[default: 3]
                     phase: test                          

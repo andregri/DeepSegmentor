@@ -1,6 +1,7 @@
 DATA_DIR=$1
 
 for i in `seq 1 14`
+#for i in 7
 do
     python3 ../pre-proc/create_osm_query.py --data_dir "${DATA_DIR}/$i"
     wget --post-file="${DATA_DIR}/$i/query.txt"  http://overpass-api.de/api/interpreter --output-document="${DATA_DIR}/$i/centerline.osm"

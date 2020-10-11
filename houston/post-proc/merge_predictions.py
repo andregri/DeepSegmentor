@@ -3,12 +3,29 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 import cv2
+import argparse
+from pathlib import Path
 
-img_dir = Path('/home/andrea/Downloads/join-images/test_image')
-pred_dir = Path('/home/andrea/Downloads/join-images/test_latest/images')
+parser = argparse.ArgumentParser(description="Merge the predictions of roadnet applying a bilinear blending")
+parser.add_argument('--results_dir', type=str, default="./results/roadnet/test_latest/images", help="dir containing the predictions")
+parser.add_argument('--image_number', type=int, default=1, help='the number of the patch (the first number of the triplet)')
+args = parser.parse_args()
 
-img_fnames  = sorted([f.as_posix() for f in img_dir.rglob('*.png')])
-pred_fnames = [f.replace('/test_image', '/test_latest/images').replace('.png', '_label_pred.png') for f in img_fnames]
+img_number = args.image_number
+print('--------------------- IMAGE {} ---------------------'.format(img_number))
+
+img_dir = Path.cwd() / Path('./datasets/Houston-Dataset/test_image')
+assert img_dir.is_dir()
+
+img_fnames  = sorted([f.as_posix() for f in img_dir.rglob('{}-*.png'.format(img_number))])
+print("Number of images: {}".format(len(img_fnames)))
+
+pred_dir = Path.cwd() / Path(args.results_dir)
+assert pred_dir.is_dir()
+
+#pred_fnames = sorted([f.as_posix() for f in pred_dir.rglob('{}-*label_pred.png'.format(img_number))])
+pred_fnames = [pred_dir.as_posix() + '/' + f.split('/')[-1].replace('.png', '_label_pred.png') for f in img_fnames]
+print("Number of predictions: {}".format(len(pred_fnames)))
 
 im_shape = [2862, 2838]
 H = 512
@@ -59,7 +76,7 @@ def bilinearBlending(image):
 def wasResized(img_fname, pred_fname, input_pred):
     img_shape  = cv2.imread(img_fname, cv2.IMREAD_COLOR).shape
     if img_shape != input_pred.shape:
-        print('- Resizing "{}"'.format(pred_fname))
+        #print('- Resizing "{}"'.format(pred_fname))
         resized = cv2.resize(input_pred, (img_shape[1],img_shape[0]))
         #cv2.imwrite(pred_fname.replace('.png','_warped.png'), pred)
         #cv2.imwrite(pred_fname, resized)
@@ -113,8 +130,6 @@ def imageCrop(im_file, save_path):
 
 def imageMerge(output_shape, img_fnames, pred_fnames, save_path, sz=(H,W), step=256):
     assert os.path.isdir(save_path)
-    #cv2.namedWindow('Merged',cv2.WINDOW_NORMAL)
-    #cv2.resizeWindow('Merged', 800,800)
 
     # Create the empty output image
     output_img = np.zeros(tuple(output_shape) + (3,), dtype=np.float32)
@@ -151,15 +166,16 @@ def imageMerge(output_shape, img_fnames, pred_fnames, save_path, sz=(H,W), step=
 
         #cv2.imshow('Merged', output_img)
         #cv2.waitKey(10)
-    cv2.destroyAllWindows()
+    #cv2.destroyAllWindows()
         
 
-    cv2.imshow('Merged', output_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    #cv2.imshow('Merged', output_img)
+    #cv2.resizeWindow('Merged', 800,800)
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
 
     output_png = np.array(output_img * 255, dtype=np.float32)
-    output_fname = save_path + '1-merged.png'
+    output_fname = save_path + "Houston-{}-pred.png".format(img_number)
     cv2.imwrite(output_fname, output_png, [cv2.IMWRITE_PNG_COMPRESSION, 0])
     print('- Merged image was saved to {}'.format(output_fname))
 
